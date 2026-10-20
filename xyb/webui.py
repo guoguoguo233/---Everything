@@ -672,15 +672,18 @@ async function refreshStatus(){
       document.getElementById('pendingBox').classList.add('hide');
     }
 
-    // 二维码
+    // 二维码：只有未登录时才显示（已登录时隐藏，避免误扫）
     const img = document.getElementById('qrImg');
-    if(s.qr_exists && s.qr_mtime > 0){
+    const loggedIn = L.logged_in === true;
+    if(!loggedIn && s.qr_exists && s.qr_mtime > 0){
       img.classList.remove('hide');
       document.getElementById('qrTip').textContent = '用「校友邦学生版小程序」扫一扫（不是微信扫一扫）；二维码会自动更新';
       img.src = '/qr.png?t=' + Math.floor(s.qr_mtime);
     } else {
       img.classList.add('hide');
-      document.getElementById('qrTip').textContent = '扫码登录时，这里会显示二维码';
+      document.getElementById('qrTip').textContent = loggedIn
+        ? '当前已登录，无需扫码；如需切换账号，点左侧「扫码登录 / 检查状态」'
+        : '扫码登录时，这里会显示二维码';
     }
     return s;
   }catch(e){
