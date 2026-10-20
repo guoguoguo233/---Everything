@@ -52,7 +52,10 @@ def call(args) -> int:
 
     EXE 版里没有独立的 Python 解释器和 run.py 脚本，所以统一改成进程内调用，
     源码版与 EXE 版走同一条代码路径，行为一致。
+    任何异常都在这里兜住并打印，避免控制台窗口直接关闭。
     """
+    import traceback
+
     import run
 
     old_argv = sys.argv
@@ -67,6 +70,26 @@ def call(args) -> int:
             return int(exc.code or 0)
         except (TypeError, ValueError):
             return 0
+    except Exception as exc:  # noqa: BLE001 - 保证错误可见，不让窗口闪退
+        print()
+        print("=" * 62)
+        print("  执行出错：")
+        print("=" * 62)
+        traceback.print_exc()
+        try:
+            log = paths.app_dir() / "_error.log"
+            import datetime as _dt
+            with log.open("a", encoding="utf-8") as f:
+                f.write("\n" + "=" * 62 + "\n")
+                f.write("时间: " + _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
+                f.write("参数: " + repr(args) + "\n")
+                f.write("TEMP: " + str(os.environ.get("TEMP")) + "\n")
+                f.write("".join(traceback.format_exception(type(exc), exc, exc.__traceback__)))
+            print(f"\n错误日志已保存到：{log}")
+        except Exception:
+            pass
+        print("\n请把上面的报错（或 _error.log）反馈给开发者。")
+        return 1
     finally:
         sys.argv = old_argv
 
