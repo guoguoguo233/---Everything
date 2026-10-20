@@ -248,6 +248,13 @@ def _get_ai_cfg(cfg: dict) -> dict:
         raise AIWriterError(f"ai.base_url 必须以 http:// 或 https:// 开头，当前是：{_mask_text(base_url)}")
     if not model:
         raise AIWriterError("配置缺少 ai.model（例如 deepseek-chat）。")
+    # 常见事故：向导里把终端提示语一起粘进来，模型名变成一句中文问话 -> 服务端 400
+    if not re.fullmatch(r"[A-Za-z0-9._:/\-]{2,80}", model):
+        raise AIWriterError(
+            f"ai.model 的取值不像模型名：{_mask_text(model)[:40]}。"
+            "请把它改成服务商支持的模型名（DeepSeek 填 deepseek-chat 或 deepseek-flash），"
+            "通常是因为粘贴时把终端提示文字也一起贴进了输入框。"
+        )
     if is_placeholder_key(api_key):
         raise AIWriterError(
             "还没有填写 AI Key：请打开 xyb/config.json，把 ai.api_key 改成你自己的 DeepSeek Key"

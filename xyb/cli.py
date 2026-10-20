@@ -8,6 +8,7 @@
 import json
 import os
 import platform
+import re
 import sys
 import time
 from pathlib import Path
@@ -141,6 +142,23 @@ def env_problems() -> list[str]:
 
 
 # ---------------- 配置向导 ----------------
+# 用户从终端复制粘贴时，很容易把整段提示文字一起贴进来（导致 model 变成一句问话）。
+# 这里识别这类"粘贴噪声"，避免写进配置。
+_NOISE_MARKERS = (
+    "（当前：", "(y/n)", "按回车键", "正在测试", "AI 接口返回", "已保存：",
+    "错误日志", "Traceback", "✗", "请输入编号", "==============================================================",
+)
+
+
+def _looks_like_paste_noise(value: str) -> bool:
+    v = (value or "").strip()
+    if not v:
+        return False
+    if v.startswith(">") or v.startswith("（当前："):
+        return True
+    return any(m in v for m in _NOISE_MARKERS)
+
+
 def ask(prompt: str, default: str = "", secret: bool = False) -> str:
     show = f"（当前：{default}）" if default and not secret else ""
     try:
@@ -152,6 +170,10 @@ def ask(prompt: str, default: str = "", secret: bool = False) -> str:
     except (EOFError, KeyboardInterrupt):
         print()
         return default
+    if val and _looks_like_paste_noise(val):
+        print("  ⚠ 检测到你似乎把终端提示文字也粘进来了，这一项已按原值保留。")
+        print("    （请只粘贴要填的内容本身，例如 Key、公司名，不要包含“>”或提示语）")
+        return default
     return val or default
 
 
@@ -160,7 +182,8 @@ def ask_list(prompt: str, default: list) -> list:
     val = ask(prompt + "（用逗号分隔，可留空）", d)
     if val == d:
         return default or []
-    return [x.strip() for x in val.replace("，", ",").split(",") if x.strip()]
+    items = [x.strip() for x in val.replace("，", ",").split(",") if x.strip()]
+    return [x for x in items if not _looks_like_paste_noise(x)]
 
 
 def wizard(cfg: dict, first_run: bool = False) -> dict:
@@ -187,8 +210,13 @@ def wizard(cfg: dict, first_run: bool = False) -> dict:
     else:
         print("  （多次输入无效，本次不修改 Key）")
 
-    model = ask("2) 模型名称", str(ai.get("model") or "deepseek-chat"))
-    ai["model"] = model or "deepseek-chat"
+    model = ask("2) 模型名称（DeepSeek 填 deepseek-chat 或 deepseek-flash）",
+                str(ai.get("model") or "deepseek-chat"))
+    # 模型名只允许字母/数字/点/横线/斜杠/冒号，防止把提示语写进配置
+    if not re.fullmatch(r"[A-Za-z0-9._:/\-]{2,80}", model or ""):
+        print(f"  ⚠ 模型名看起来不合法（{model!r}），已改回 deepseek-chat。")
+        model = "deepseek-chat"
+    ai["model"] = model
     ai.setdefault("base_url", "https://api.deepseek.com/v1")
 
     intern["company"] = ask("3) 实习单位名称（留空=自动从校友邦读取）", str(intern.get("company") or ""))
