@@ -174,11 +174,18 @@ def wizard(cfg: dict, first_run: bool = False) -> dict:
     print("  · DeepSeek Key 申请方法见 docs/AI接口接入.md")
     print("  · 直接回车 = 保持原值")
     print()
-
-    k = ask("1) DeepSeek API Key（sk- 开头的字符串，输入时不显示）",
-            str(ai.get("api_key") or ""), secret=True)
-    if k:
-        ai["api_key"] = k
+    print("  ⚠ 注意：Key 会显示在屏幕上（隐藏输入在 Windows 控制台里粘贴容易只收到第一个字符）。")
+    print("    输入框里请用【右键粘贴】或 Ctrl+V，粘贴完检查一下长度是不是 30 多个字符。")
+    for attempt in range(3):
+        k = ask("1) DeepSeek API Key（sk- 开头的字符串）", str(ai.get("api_key") or ""))
+        if not k:
+            break
+        if len(k) >= 20 and k.startswith("sk-"):
+            ai["api_key"] = k
+            break
+        print(f"  ✗ 这个 Key 看起来不完整（长度 {len(k)}，应以 sk- 开头且通常 30 多个字符）。请重新输入，或直接回车跳过。")
+    else:
+        print("  （多次输入无效，本次不修改 Key）")
 
     model = ask("2) 模型名称", str(ai.get("model") or "deepseek-chat"))
     ai["model"] = model or "deepseek-chat"

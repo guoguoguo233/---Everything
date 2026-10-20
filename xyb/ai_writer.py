@@ -253,6 +253,13 @@ def _get_ai_cfg(cfg: dict) -> dict:
             "还没有填写 AI Key：请打开 xyb/config.json，把 ai.api_key 改成你自己的 DeepSeek Key"
             "（形如 sk-xxxxxxxx），保存后再试。"
         )
+    # 常见事故：粘贴只进了第一个字符 / 末尾带了多余字符。提前拦下，避免服务端只回一个 400。
+    if len(api_key) < 20 or not api_key.startswith("sk-"):
+        raise AIWriterError(
+            f"AI Key 看起来不完整（当前长度 {len(api_key)}，正常应是以 sk- 开头、30 多个字符）。"
+            "请在菜单 [6] 重新粘贴一次完整 Key（粘贴后看一眼输入框里的内容对不对），"
+            "或直接编辑 config.json 的 ai.api_key。"
+        )
 
     try:
         temperature = float(ai.get("temperature", 0.7))
