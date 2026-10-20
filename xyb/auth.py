@@ -181,7 +181,8 @@ def qr_login(client, wait_seconds: int = WAIT_SECONDS) -> bool:
                 log("login.action 异常:", str(e)[:150])
             client.page.wait_for_timeout(2000)
             if is_logged_in(client):
-                log("登录成功，登录态已保存。")
+                client.save_cookies()
+                log("登录成功，登录态已保存（并做了 cookie 快照，避免下次掉登录）。")
                 return True
             log("login.action 已返回，但登录态校验未通过，继续等待…")
         time.sleep(3)
@@ -191,11 +192,28 @@ def qr_login(client, wait_seconds: int = WAIT_SECONDS) -> bool:
 
 
 def ensure_login(client, wait_seconds: int = WAIT_SECONDS) -> bool:
+    """确保处于登录态；未登录时直接进入扫码流程（会打印醒目提示）。"""
     client.goto("#/workbench")
     client.page.wait_for_timeout(2500)
     client.cache_secret_url()
-    for _ in range(3):
-        if is_logged_in(client, verbose=True):
-            return True
-        client.page.wait_for_timeout(2000)
+
+    # 连续检测几次，避免页面刚加载时接口还没返回
+    ok = False
+    for i in range(3):
+        if is_logged_in(client, verbose=False):
+            ok = True
+            break
+        client.page.wait_for_timeout(1500)
+    if ok:
+        try:
+            client.save_cookies()  # 顺手刷新 cookie 快照
+        except Exception:
+            pass
+        return True
+
+    log("")
+    log("*" * 62)
+    log("  当前未登录（或登录已过期），需要扫码登录一次。")
+    log("  这不是报错，是正常流程：校友邦的登录状态会过期。")
+    log("*" * 62)
     return qr_login(client, wait_seconds)

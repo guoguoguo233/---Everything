@@ -22,6 +22,7 @@ import paths  # noqa: E402
 WORK = paths.app_dir()
 PROFILE_DIR = paths.profile_dir()
 SESSION_FILE = paths.session_path()
+COOKIE_SNAPSHOT = paths.app_dir() / "_cookies.json"
 
 PERSONAL = "https://www.xybsyw.com/personal/"
 
@@ -102,15 +103,78 @@ class XybClient:
             ],
         )
         self.page = self._ctx.pages[0] if self._ctx.pages else self._ctx.new_page()
+        self._restore_cookies()
         return self
 
     def __exit__(self, *exc):
+        """关闭浏览器。
+
+        安全软件可能在运行中结束 Playwright 的 driver/node 进程，此时 close() 会抛
+        "Connection closed while reading from the driver"。这类异常与业务无关，
+        不能让整个程序崩溃（否则窗口闪退、cookie 也可能没落盘），因此全部吞掉。
+        """
         try:
             if self._ctx:
                 self._ctx.close()
+        except Exception:
+            pass
         finally:
-            if self._pw:
-                self._pw.stop()
+            try:
+                if self._pw:
+                    self._pw.stop()
+            except Exception:
+                pass
+
+    # ---------- Cookie 快照（登录态兜底） ----------
+    def save_cookies(self) -> bool:
+        """把当前 cookie 存成快照，供下次启动恢复（防止 Chrome 被安全软件结束导致掉登录）。"""
+        try:
+            cookies = self._ctx.cookies()
+            COOKIE_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
+            COOKIE_SNAPSHOT.write_text(
+                json.dumps({"saved_at": time.strftime("%Y-%m-%d %H:%M:%S"), "cookies": cookies},
+                           ensure_ascii=False),
+                encoding="utf-8",
+            )
+            return True
+        except Exception:
+            return False
+
+    def _restore_cookies(self) -> bool:
+        """启动时把上次保存的 cookie 注回浏览器（尽力而为，失败不影响流程）。"""
+        try:
+            if not COOKIE_SNAPSHOT.exists():
+                return False
+            data = json.loads(COOKIE_SNAPSHOT.read_text(encoding="utf-8-sig"))
+            cookies = data.get("cookies") or []
+            if not cookies:
+                return False
+            cleaned = []
+            for ck in cookies:
+                item = {
+                    "name": ck.get("name"),
+                    "value": ck.get("value"),
+                    "domain": ck.get("domain"),
+                    "path": ck.get("path") or "/",
+                }
+                if not item["name"] or not item["domain"]:
+                    continue
+                if ck.get("expires") and ck["expires"] > 0:
+                    item["expires"] = ck["expires"]
+                if "httpOnly" in ck:
+                    item["httpOnly"] = bool(ck["httpOnly"])
+                if "secure" in ck:
+                    item["secure"] = bool(ck["secure"])
+                same_site = str(ck.get("sameSite") or "").capitalize()
+                if same_site in ("Strict", "Lax", "None"):
+                    item["sameSite"] = same_site
+                cleaned.append(item)
+            if cleaned:
+                self._ctx.add_cookies(cleaned)
+                return True
+        except Exception:
+            pass
+        return False
 
     # ---------- 登录 ----------
     def goto(self, route: str):
