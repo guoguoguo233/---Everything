@@ -9,7 +9,8 @@
 不保存校友邦账号密码，不内置任何账号，不绕过平台限制。
 
 > **普通用户请直接下载 EXE，不用安装 Python。**
-> 打开本仓库的 **Releases** 页面 → 下载 `校友邦周志助手.exe`（单文件，约 55MB）
+> 方式 1（推荐）：打开本仓库的 **Releases** 页面 → 下载 `校友邦周志助手.exe`（单文件，约 55MB）
+> 方式 2：在仓库文件列表里点击根目录的 **`校友邦周志助手.exe`** → 右上角 **Download raw file** 下载
 > → 放到一个有写权限的文件夹（如 `D:\周志助手\`）→ 双击运行，按首次向导填 Key、扫码登录即可。
 >
 > 源码版（需要 Python，双击 `install.bat` / `start.bat`）继续保留，适合开发者、想自己改代码的同学，
@@ -61,7 +62,9 @@
 
 ### 方式一：EXE 版（3 步，推荐普通用户）
 
-1. **下载 exe**：打开本仓库的 **Releases** 页面，在最新版本的 Assets 里下载 `校友邦周志助手.exe`（单文件，约 55MB）。
+1. **下载 exe**（两种方式任选）：
+   - **Releases 页（推荐）**：打开本仓库的 **Releases** 页面，在最新版本的 Assets 里下载 `校友邦周志助手.exe`（单文件，约 55MB）；
+   - **仓库内直接下载**：在仓库文件列表点击根目录的 `校友邦周志助手.exe`，再点右上角 **Download raw file**。
    - 把 exe 放到一个**有写权限的普通文件夹**，例如 `D:\周志助手\`。**不要**放 `C:\Program Files`（没有写权限，配置和归档会存不下来）。
    - 不需要安装、不需要解压，也不用装 Python。
 2. **双击 exe 运行**：首次启动时单文件 EXE 要先自解压，**通常 5～10 秒才出现窗口（杀毒软件扫描时可能更久），这是正常的**，不要以为卡死而反复双击。
@@ -180,6 +183,7 @@ xyb-journal/
 ├─ LICENSE                    MIT 许可证
 ├─ .gitignore                 排除本地 Key、登录态、归档等私有文件，以及 dist/、build/、*.spec 等 EXE 构建产物
 ├─ requirements.txt           Python 依赖（requests / playwright / qrcode / pillow）
+├─ 校友邦周志助手.exe          免安装单文件 EXE（v1.0.0，约 55MB，直接下载即可用）
 ├─ install.bat                源码版安装入口：检查 Python（缺失时尝试 winget），然后调用 tools/install.py
 ├─ start.bat                  源码版启动脚本：调用 xyb/cli.py 打开菜单
 ├─ build_exe.py               打包脚本（开发者用）：python build_exe.py 一键生成单文件 EXE（约 55MB）
@@ -207,7 +211,7 @@ xyb-journal/
    └─ 待提交预览_第X-Y周.md
 ```
 
-> **EXE 构建产物不入库**：`build_exe.py` 打包生成的 `dist\校友邦周志助手.exe`、`build\`、`*.spec` 等只上传到 GitHub Releases，不提交到仓库。仓库里没有现成的 exe，请从 Releases 页下载。
+> **关于仓库里的 EXE**：仓库根目录提供了 `校友邦周志助手.exe`（v1.0.0）方便直接下载；`build_exe.py` 打包生成的 `dist\`、`build\`、`*.spec` 属于构建产物，已被 `.gitignore` 排除、不提交。二进制文件的规范做法是放到 **Releases** 页，仓库内保留一份是为了方便没有 Release 时也能下载。
 
 ## 进阶用法（可选，仅源码版）
 
