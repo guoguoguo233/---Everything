@@ -1,0 +1,15 @@
+# 统一换行符：
+# - .bat 必须是 CRLF，否则 cmd.exe 解析 goto/label 可能出问题（GitHub ZIP 下载也一样）
+# - Python / Markdown / JSON 用 LF
+* text=auto
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

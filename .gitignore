@@ -1,0 +1,33 @@
+# ===== 本地私有数据（绝对不要提交，含你的 API Key 和学校信息）=====
+xyb/config.json
+xyb/config*.json
+!xyb/config.example.json
+xyb/.session.json
+
+# ===== 运行时产物 =====
+chrome-profile/
+xyb/.pending.json
+xyb/.pending_batch.json
+xyb/qr.png
+xyb/qr_*.png
+周志记录/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+
+# ===== 开发/调试目录（本地保留，不发布）=====
+research/
+
+# ===== 编辑器与系统文件 =====
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

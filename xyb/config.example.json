@@ -1,0 +1,32 @@
+{
+  "ai": {
+    "base_url": "https://api.deepseek.com/v1",
+    "model": "deepseek-chat",
+    "api_key": "sk-在这里填你的DeepSeekKey",
+    "temperature": 0.8,
+    "timeout": 90
+  },
+  "internship": {
+    "company": "",
+    "position": "",
+    "industry": "",
+    "work_summary": "",
+    "common_tasks": [],
+    "tech_stack": []
+  },
+  "style": {
+    "min_words": 320,
+    "max_words": 620,
+    "tone": "平实、具体、第一人称；像学生自己写的实习记录，不要总结报告腔，不要空话套话",
+    "format": "分3到4段：本周具体工作内容 / 遇到的问题与解决过程 / 收获与体会 / 下周计划",
+    "title_pattern": "{position}实习周志（第{index}周）"
+  },
+  "record": {
+    "dir": "周志记录",
+    "file": "周志记录.md"
+  },
+  "zhizhi": {
+    "type": "w",
+    "visicty": "2"
+  }
+}

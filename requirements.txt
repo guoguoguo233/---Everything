@@ -1,0 +1,6 @@
+# Python dependencies for xyb-weekly-journal
+# Keep this file ASCII-only: pip may decode it with the system locale codec.
+requests>=2.28
+playwright>=1.40
+qrcode>=7.4
+pillow>=9.0
