@@ -1,4 +1,4 @@
-# 校友邦周志助手
+﻿# 校友邦周志助手
 
 > 英文仓库名：`xyb-weekly-journal`
 
@@ -185,6 +185,7 @@ xyb-journal/
 ├─ requirements.txt           Python 依赖（requests / playwright / qrcode / pillow）
 ├─ 校友邦周志助手.exe          免安装单文件 EXE（v1.0.0，约 55MB，直接下载即可用）
 ├─ 启动-兼容模式.bat            兼容启动器：把临时目录改到 exe 同目录，绕开火绒/360 对单文件 EXE 自解压的拦截
+├─ 诊断-兼容模式.bat            兼容模式诊断：生成 _diag.txt，用于反馈被拦截的问题
 ├─ install.bat                源码版安装入口：检查 Python（缺失时尝试 winget），然后调用 tools/install.py
 ├─ start.bat                  源码版启动脚本：调用 xyb/cli.py 打开菜单
 ├─ build_exe.py               打包脚本（开发者用）：python build_exe.py 一键生成单文件 EXE（约 55MB）
