@@ -100,6 +100,11 @@ def main() -> int:
         "--exclude-module", "pandas",
         str(ENTRY),
     ]
+    if not onedir:
+        # 单文件版默认把自解压目录从系统 %TEMP% 改到 %LOCALAPPDATA%\XybJournal。
+        # 火绒/360 等安全软件常拦截"程序往系统临时目录写文件"，改到非 Temp 目录可绕开；
+        # 目录名带程序名，便于用户识别和手动清理。
+        cmd += ["--runtime-tmpdir", r"%LOCALAPPDATA%\XybJournal"]
     code = run(cmd)
     if code != 0:
         print()
