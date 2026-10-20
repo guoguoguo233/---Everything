@@ -421,6 +421,39 @@ def _status() -> dict:
     }
 
 
+def _save_pending(payload: dict) -> dict:
+    """把网页里编辑过的标题/正文写回待提交文件（不提交）。"""
+    import html as html_lib
+
+    p = paths.pending_path()
+    if not p.exists():
+        return {"ok": False, "error": "当前没有待提交内容（请先生成）"}
+    try:
+        data = json.loads(p.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        return {"ok": False, "error": f"读取待提交内容失败：{exc}"}
+
+    title = str(payload.get("title") or "").strip()
+    text = str(payload.get("text") or "").strip()
+    if title:
+        if len(title) > 40:
+            return {"ok": False, "error": "标题不能超过 40 字（校友邦限制）"}
+        data["title"] = title
+    if text:
+        escaped = html_lib.escape(text)
+        paras = [line.strip() for line in escaped.split("\n") if line.strip()]
+        if not paras:
+            return {"ok": False, "error": "正文不能为空"}
+        data["content_text"] = text
+        data["content_html"] = "".join(f"<p>{line}</p>" for line in paras)
+        data["edited_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as exc:
+        return {"ok": False, "error": f"保存失败：{exc}"}
+    return {"ok": True, "words": len([c for c in text if c.strip()]) if text else None}
+
+
 def _save_config(payload: dict) -> dict:
     import ai_writer
 
@@ -494,6 +527,7 @@ label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
 input,textarea,select{width:100%;font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#fbfcff}
 textarea{min-height:110px;resize:vertical}
 pre{background:#0f172a;color:#dbe3f4;border-radius:12px;padding:12px;font-size:12px;line-height:1.55;overflow:auto;max-height:320px;white-space:pre-wrap;word-break:break-word;margin:10px 0 0}
+.editarea{min-height:300px;line-height:1.8;font-size:14px;padding:12px;white-space:pre-wrap;font-family:inherit}
 .preview{white-space:pre-wrap;line-height:1.8;font-size:14px;background:#fbfcff;border:1px dashed var(--line);border-radius:10px;padding:12px;max-height:380px;overflow:auto}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .muted{color:var(--muted);font-size:12px}
@@ -556,9 +590,16 @@ th{color:var(--muted);font-weight:500}
           <button class="warn" onclick="revise()">按修改意见重写</button>
           <button class="ghost" onclick="discard()">放弃</button>
         </div>
-        <label>修改意见（点"按修改意见重写"前填写；例如：多写具体细节、语气再朴素些、少写套话）</label>
+        <label>标题（可直接修改，最多 40 字）</label>
+        <input id="editTitle" maxlength="40" placeholder="标题">
+        <label>正文（可在下面直接打字修改，改完点“保存修改”或直接“提交”）</label>
+        <textarea id="editText" class="editarea" placeholder="正文"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button onclick="savePending()">保存修改（不提交）</button>
+          <span class="muted" id="editState"></span>
+        </div>
+        <label style="margin-top:14px">修改意见（让 AI 按意见重写；例如：多写具体细节、语气再朴素些、少写套话）</label>
         <input id="feedback" placeholder="填写修改意见后点“按修改意见重写”">
-        <div class="preview" id="pendingText" style="margin-top:10px"></div>
       </div>
     </div>
 
@@ -662,14 +703,19 @@ async function refreshStatus(){
     kb.textContent = 'AI Key：' + (s.key_configured ? ('已配置 ' + (s.key_masked||'')) : '未配置');
     document.getElementById('modelBadge').textContent = '模型：' + (s.model || '-');
 
-    // 待提交内容
+    // 待提交内容（可编辑；用户正在编辑时不覆盖）
     if(s.pending){
       document.getElementById('pendingBox').classList.remove('hide');
       document.getElementById('pendingMeta').textContent =
         '第' + s.pending.week + '周 · ' + s.pending.title + ' · 约' + s.pending.words + '字 · 生成于 ' + (s.pending.generated_at||'');
-      document.getElementById('pendingText').textContent = s.pending.text || '';
+      if(!window.pendingDirty){
+        document.getElementById('editTitle').value = s.pending.title || '';
+        document.getElementById('editText').value = s.pending.text || '';
+        document.getElementById('editState').textContent = '';
+      }
     } else {
       document.getElementById('pendingBox').classList.add('hide');
+      window.pendingDirty = false;
     }
 
     // 二维码：只有未登录时才显示（已登录时隐藏，避免误扫）
@@ -739,7 +785,38 @@ function revise(){
   document.getElementById('genMsg').textContent = '正在按修改意见重写…';
   act('gen', {notes: val('notes'), feedback: fb});
 }
-function submitPending(){ if(confirm('确认把这篇提交到校友邦？')) act('submit_pending'); }
+function markDirty(){
+  window.pendingDirty = true;
+  const t = document.getElementById('editText').value || '';
+  const words = Array.from(t).filter(c => c.trim()).length;
+  document.getElementById('editState').textContent = '已修改（约 ' + words + ' 字），点“保存修改”或直接提交';
+  document.getElementById('editState').className = 'muted';
+}
+
+async function savePending(silent){
+  const body = {title: val('editTitle'), text: document.getElementById('editText').value || ''};
+  const r = await api('/api/pending','POST',body);
+  const st = document.getElementById('editState');
+  if(r.ok){
+    window.pendingDirty = false;
+    st.textContent = '已保存' + (r.words ? ('（约 ' + r.words + ' 字）') : '');
+    st.className = 'muted';
+    if(!silent) refreshStatus();
+    return true;
+  }
+  st.textContent = '保存失败：' + (r.error || '');
+  st.className = 'muted';
+  return false;
+}
+
+async function submitPending(){
+  if(!confirm('确认把这篇提交到校友邦？')) return;
+  if(window.pendingDirty){
+    const saved = await savePending(true);
+    if(!saved){ alert('编辑内容保存失败，已取消提交'); return; }
+  }
+  act('submit_pending');
+}
 function discard(){ if(confirm('放弃这次生成的内容？（不会提交）')) act('discard'); }
 function clearJob(){ document.getElementById('log').textContent=''; }
 
@@ -765,6 +842,10 @@ async function poll(){
 }
 
 (async function init(){
+  const et = document.getElementById('editText');
+  const ti = document.getElementById('editTitle');
+  if(et) et.addEventListener('input', markDirty);
+  if(ti) ti.addEventListener('input', markDirty);
   await refreshStatus();
   loadCfg();
   setInterval(refreshStatus, 3000);
@@ -845,6 +926,9 @@ class Handler(BaseHTTPRequestHandler):
             params = {k: v for k, v in payload.items() if k != "action"}
             job = submit_job(action, params)
             self._json({"ok": True, "job_id": job["id"]})
+            return
+        if path == "/api/pending":
+            self._json(_save_pending(payload))
             return
         if path == "/api/config":
             self._json(_save_config(payload))
