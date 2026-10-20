@@ -2,27 +2,27 @@
 """
 校友邦周志助手 · 一键菜单
 
-双击 start.bat 就会进入这个菜单，按数字选择功能，不需要记命令。
+双击 start.bat（源码版）或 校友邦周志助手.exe（免安装版）都会进入这个菜单，
+按数字选择功能，不需要记命令。
 """
 import json
 import os
 import platform
-import subprocess
 import sys
 import time
 from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-ROOT = Path(__file__).resolve().parent.parent
-PKG = Path(__file__).resolve().parent
-RUN_PY = PKG / "run.py"
-SYNC_PY = PKG / "sync_archive.py"
-CONFIG = PKG / "config.json"
-CONFIG_EXAMPLE = PKG / "config.example.json"
+import paths  # noqa: E402
+
+ROOT = paths.app_dir()
+CONFIG = paths.config_path()
+CONFIG_EXAMPLE = paths.example_config_path()
 TITLE = "校友邦周志助手"
 VERSION = "1.0.0"
 PLACEHOLDER = "sk-在这里填你的DeepSeekKey"
+FROZEN = paths.is_frozen()
 
 LINE = "=" * 62
 
@@ -48,17 +48,27 @@ def wait_enter(prompt: str):
 
 
 def call(args) -> int:
-    """调用子脚本，输出直接透传到控制台"""
-    env = dict(os.environ)
-    env["PYTHONIOENCODING"] = "utf-8"
-    cmd = [sys.executable, "-u", str(RUN_PY if args is not SYNC_PY else SYNC_PY)]
-    if args is not SYNC_PY:
-        cmd += [str(a) for a in args]
+    """在当前进程内执行 run.py 的主流程。
+
+    EXE 版里没有独立的 Python 解释器和 run.py 脚本，所以统一改成进程内调用，
+    源码版与 EXE 版走同一条代码路径，行为一致。
+    """
+    import run
+
+    old_argv = sys.argv
+    sys.argv = ["run.py"] + [str(a) for a in args]
     try:
-        return subprocess.call(cmd, cwd=str(ROOT), env=env)
+        return int(run.main() or 0)
     except KeyboardInterrupt:
         print("\n已中断。")
         return 130
+    except SystemExit as exc:
+        try:
+            return int(exc.code or 0)
+        except (TypeError, ValueError):
+            return 0
+    finally:
+        sys.argv = old_argv
 
 
 def load_cfg() -> dict:
@@ -86,14 +96,17 @@ def key_status(cfg: dict) -> str:
 
 def env_problems() -> list[str]:
     probs = []
-    if sys.version_info < (3, 10):
+    if not FROZEN and sys.version_info < (3, 10):
         probs.append(f"Python 版本过低（当前 {platform.python_version()}），需要 3.10 或更高")
     for mod, name in [("playwright", "playwright"), ("requests", "requests"),
                       ("qrcode", "qrcode"), ("PIL", "pillow")]:
         try:
             __import__(mod)
         except ImportError:
-            probs.append(f"缺少依赖：{name}（请退出后双击 install.bat）")
+            if FROZEN:
+                probs.append(f"程序文件不完整：缺少 {name}，请重新下载 EXE（可能被杀毒软件删了文件）")
+            else:
+                probs.append(f"缺少依赖：{name}（请退出后双击 install.bat）")
     chrome_paths = [
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -259,9 +272,19 @@ def act_sync():
 
 
 def call_sync():
-    env = dict(os.environ)
-    env["PYTHONIOENCODING"] = "utf-8"
-    subprocess.call([sys.executable, "-u", str(SYNC_PY)], cwd=str(ROOT), env=env)
+    """进程内执行归档同步。"""
+    import sync_archive
+
+    try:
+        return int(sync_archive.main() or 0)
+    except KeyboardInterrupt:
+        print("\n已中断。")
+        return 130
+    except SystemExit as exc:
+        try:
+            return int(exc.code or 0)
+        except (TypeError, ValueError):
+            return 0
 
 
 def act_config(cfg: dict):
@@ -269,8 +292,70 @@ def act_config(cfg: dict):
     pause()
 
 
+# ---------------- 环境自检（--check） ----------------
+def quick_login_status() -> str:
+    """快速判断登录态，未登录时不会卡在扫码等待。"""
+    try:
+        from browser import XybClient
+        import auth
+    except Exception as e:
+        return f"组件加载失败：{e}"
+    try:
+        with XybClient(headless=True) as c:
+            c.goto("#/workbench")
+            c.page.wait_for_timeout(2500)
+            c.cache_secret_url()
+            if auth.is_logged_in(c):
+                info = auth.loginer_info(c)
+                return f"已登录：{info.get('loginer') or '?'} | {info.get('schoolName') or '?'}"
+            return "未登录（启动程序后选 [1] 扫码登录）"
+    except Exception as e:
+        return f"登录检测失败：{str(e)[:120]}（可先忽略，启动程序后选 [1] 重试）"
+
+
+def do_check() -> int:
+    """打印环境自检信息，供排错和 Issue 使用。"""
+    probs = env_problems()
+    print(LINE)
+    print(f"  {TITLE} v{VERSION} —— 环境自检")
+    print(LINE)
+    print(f"  运行方式   ：{'EXE 免安装版' if FROZEN else '源码版（Python）'}")
+    print(f"  操作系统   ：{platform.platform()}")
+    if not FROZEN:
+        print(f"  Python     ：{platform.python_version()}")
+    print(f"  程序目录   ：{ROOT}")
+    print(f"  配置文件   ：{CONFIG}（{'存在' if CONFIG.exists() else '不存在，将自动创建'}）")
+    cfg = load_cfg()
+    print(f"  AI Key     ：{key_status(cfg)}")
+    print(f"  模型       ：{(cfg.get('ai') or {}).get('model') or '?'}")
+    print()
+    if probs:
+        print("  环境检查   ：发现问题")
+        for p in probs:
+            print("    ✗", p)
+    else:
+        print("  环境检查   ：通过（依赖完整、Chrome 已安装）")
+    print()
+    print("  正在检查登录态（约 5 秒，会启动一次 Chrome）…")
+    print(f"  登录状态   ：{quick_login_status()}")
+    print()
+    print("  提示：完整功能请直接运行本程序（不加参数）。")
+    print(LINE)
+    return 0 if not probs else 1
+
+
 # ---------------- 主循环 ----------------
 def main():
+    argv = sys.argv[1:]
+    if "--version" in argv or "-V" in argv:
+        print(f"{TITLE} v{VERSION}（{'EXE' if FROZEN else '源码'}）")
+        return 0
+    if "--check" in argv:
+        try:
+            return do_check()
+        except KeyboardInterrupt:
+            return 0
+
     config_existed = CONFIG.exists()
     cfg = load_cfg()
     need_key = key_status(cfg).startswith("未配置")
@@ -285,7 +370,10 @@ def main():
         print(LINE)
         for p in probs:
             print("  ✗", p)
-        print("\n请先双击 install.bat 完成安装，再运行本程序。")
+        if FROZEN:
+            print("\n请把本程序放在一个可写的普通文件夹后重新运行；仍失败请重新下载 EXE。")
+        else:
+            print("\n请先双击 install.bat 完成安装，再运行本程序。")
         wait_enter("\n按回车键退出…")
         return 1
 
@@ -313,6 +401,7 @@ def main():
         print(LINE)
         print(f"  AI Key：{key_status(cfg)}")
         print(f"  配置文件：{CONFIG}")
+        print(f"  运行方式：{'EXE 免安装版' if FROZEN else '源码版（Python）'}")
         print("-" * 62)
         print("  [1] 登录 / 检查登录状态")
         print("  [2] 写本周周志（生成 → 预览 → 确认 → 提交）")
@@ -342,7 +431,7 @@ def main():
         elif choice == "6":
             act_config(cfg)
         elif choice == "7":
-            readme = ROOT / "README.md"
+            readme = paths.readme_path()
             if readme.exists():
                 try:
                     os.startfile(str(readme))  # type: ignore[attr-defined]

@@ -17,8 +17,10 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-WORK = Path(__file__).resolve().parent.parent
-QR_PNG = WORK / "xyb" / "qr.png"
+import paths  # noqa: E402
+
+WORK = paths.app_dir()
+QR_PNG = paths.qr_png_path()
 PORT = 8765
 CHARSET = "0123456789ABCDEF"
 CODE_REFRESH_SECONDS = 100

@@ -4,6 +4,13 @@ xyb/config*.json
 !xyb/config.example.json
 xyb/.session.json
 
+# EXE 便携版的私有数据也可能出现在仓库根目录（正常不会被创建，仅作保护）
+/config.json
+/.session.json
+/qr.png
+/.pending.json
+/.pending_batch.json
+
 # ===== 运行时产物 =====
 chrome-profile/
 xyb/.pending.json
@@ -11,6 +18,11 @@ xyb/.pending_batch.json
 xyb/qr.png
 xyb/qr_*.png
 周志记录/
+
+# ===== EXE 打包产物（不提交仓库，只上传 GitHub Releases）=====
+build/
+dist/
+*.spec
 
 # ===== Python =====
 __pycache__/

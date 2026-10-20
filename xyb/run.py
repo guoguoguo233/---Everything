@@ -28,11 +28,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from browser import XybClient, XybError  # noqa: E402
 import auth  # noqa: E402
 import ai_writer  # noqa: E402
+import paths  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = paths.app_dir()
 PLACEHOLDER = "sk-在这里填你的DeepSeekKey"
-PENDING_PATH = ROOT / "xyb" / ".pending.json"
-BATCH_PATH = ROOT / "xyb" / ".pending_batch.json"
+PENDING_PATH = paths.pending_path()
+BATCH_PATH = paths.batch_path()
 
 
 def parse_weeks_arg(text: str, all_weeks: list[int]) -> list[int]:

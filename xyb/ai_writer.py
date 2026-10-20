@@ -40,8 +40,10 @@ except Exception:  # pragma: no cover - 环境没有 requests 时走 urllib
 
 try:  # 可选：仅用于从本地文件路径推断，实际以 __file__ 为准
     from . import prompts  # type: ignore  # 作为包导入时（xyb.ai_writer）
+    from . import paths  # type: ignore
 except ImportError:  # 作为脚本直接运行时（python ai_writer.py 或 sys.path 里有 xyb）
     import prompts  # type: ignore
+    import paths  # type: ignore
 
 
 # ---------------------------------------------------------------------------
@@ -88,20 +90,35 @@ class AIWriterError(RuntimeError):
 # ---------------------------------------------------------------------------
 
 def default_config_path() -> Path:
-    """默认配置文件路径：xyb/config.json（与本文件同目录，不依赖当前工作目录）。"""
-    return MODULE_DIR / CONFIG_FILENAME
+    """默认配置文件路径。
+    源码运行 = 仓库根/xyb/config.json；EXE 运行 = EXE 同目录/config.json。"""
+    try:
+        return paths.config_path()
+    except Exception:
+        return MODULE_DIR / CONFIG_FILENAME
+
+
+def _example_config_path(config_path: Path) -> Path:
+    """配置模板路径（EXE 里模板被打包进只读资源目录）。"""
+    try:
+        p = paths.example_config_path()
+        if p.exists():
+            return p
+    except Exception:
+        pass
+    return config_path.parent / EXAMPLE_FILENAME
 
 
 def load_config(path: str | os.PathLike | None = None) -> dict:
     """读取配置文件。
 
-    - 默认读取 xyb/config.json；
+    - 默认读取 config.json（源码版在 xyb/ 下，EXE 版在 exe 同目录）；
     - 文件不存在 -> FileNotFoundError，消息里提示复制 config.example.json；
     - JSON 写错 -> AIWriterError，消息里给出行列号。
     """
     config_path = Path(path) if path else default_config_path()
     if not config_path.exists():
-        example = config_path.parent / EXAMPLE_FILENAME
+        example = _example_config_path(config_path)
         if example.exists():
             hint = f"请先把 {example} 复制为 {config_path}，再填写 ai.api_key 后重试。"
         else:

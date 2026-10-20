@@ -16,8 +16,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from browser import XybClient  # noqa: E402
 import auth  # noqa: E402
 import run  # noqa: E402
+import paths  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = paths.app_dir()
 OUT_MD = ROOT / "周志记录" / "周志记录.md"
 
 

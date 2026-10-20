@@ -3,6 +3,10 @@
 > 这篇文档写给「第一次听说 API Key」的同学。
 > 读完你应该能：申请到 DeepSeek 的 Key、把它填进软件、看懂常见报错、知道大概花多少钱，
 > 以及想换别家模型时该改哪里。
+>
+> 本文同时适用于 **EXE 版**（免安装，双击 exe 使用）和**源码版**（需要 Python）：
+> 填 Key 的位置和界面操作完全一样，只是**配置文件位置不同**——
+> EXE 版在 exe 同目录的 `config.json`，源码版在 `xyb/config.json`，文中会分别标注。
 
 ---
 
@@ -49,10 +53,10 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
 
 ## 2. 把 Key 填进软件（两种方式，任选一种）
 
-### 方式一：用菜单 6（推荐，不用手改文件）
+### 方式一：用首次向导或菜单 6（推荐，不用手改文件）
 
-1. 双击仓库根目录的 `start.bat`，进入主菜单。
-2. 输入 `6`，按回车，进入「修改配置」向导。
+1. 启动程序：**EXE 版**双击 `校友邦周志助手.exe`；**源码版**双击仓库根目录的 `start.bat`。进入主菜单。
+2. 第一次使用会自动显示欢迎语和配置向导；以后要修改，输入 `6`，按回车，进入「修改配置」向导。
 3. 向导第 1 项是 **`DeepSeek API Key`**。把复制好的 Key 粘贴进去，按回车。
    - 输入时屏幕上**不会显示**你输入的内容，这是正常的。
    - 在 Windows 命令行窗口里，右键一般就是粘贴。
@@ -61,17 +65,24 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
    - 输入 `y` 回车：软件会真的发一次很短的请求，显示「连通正常」就说明 Key 可用。
    - 输入 `n` 回车：跳过测试，稍后生成周志时也能验证。
 
-> 第一次双击 `start.bat` 会自动进入欢迎语和配置向导，按提示填 Key 就行，不需要先手动选 6。
-> 以后要修改配置，选菜单 `6` 即可。
+> 第一次启动程序会自动进入欢迎语和配置向导，按提示填 Key 就行，不需要先手动选 6。
+> 以后要修改配置，选菜单 `6` 即可。EXE 版和源码版这一步完全相同。
 
-### 方式二：直接编辑 `xyb/config.json`
+### 方式二：直接编辑配置文件
 
 适合想一次改多项、或者想换别家服务商（改 `base_url`）的同学。
 
-1. 打开仓库里的 `xyb` 文件夹，找到 `config.json`。
+配置文件位置：
+
+- **EXE 版**：exe 同目录的 `config.json`（和 exe 放在一起）；
+- **源码版**：仓库里的 `xyb/config.json`。
+
+1. 找到配置文件：
+   - EXE 版：打开 exe 所在的文件夹，找到 `config.json`；
+   - 源码版：打开仓库里的 `xyb` 文件夹，找到 `config.json`。
    - 右键 `config.json` →「打开方式」→「记事本」。
-   - 如果只有 `config.example.json`、没有 `config.json`：先把 `config.example.json` 复制一份，
-     重命名为 `config.json`，再打开。
+   - 如果只有 `config.example.json`、没有 `config.json`：先启动一次程序（会自动生成），或者把
+     `config.example.json` 复制一份，重命名为 `config.json`，再打开。
 2. 找到这一段：
 
    ```json
@@ -95,7 +106,7 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
    - **保留这一行末尾的英文逗号**（如果后面还有字段）。
    - 不要用 Word、写字板等会加格式的软件，用记事本或 VS Code 即可。
    - 保存时编码选 UTF-8（记事本默认就是）。
-4. 保存文件，关闭记事本，重新双击 `start.bat`。
+4. 保存文件，关闭记事本，重新启动程序（EXE 版双击 exe；源码版双击 `start.bat`）。
 
 ### 怎么确认填对了
 
@@ -128,7 +139,7 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
 | **402 余额不足** | 账户还没充值，或余额已用完。 | 到 DeepSeek 后台「充值」页面充值，到账后重试。 |
 | **404 接口地址或模型不存在** | `ai.base_url` 或 `ai.model` 写错；换服务商后只改了模型没改地址。 | DeepSeek 用 `base_url = https://api.deepseek.com/v1`、`model = deepseek-chat`；检查有没有漏掉 `/v1`，也不用自己补 `/chat/completions`（程序会自动拼）。 |
 | **429 请求太频繁** | 短时间内连续生成/重试太多次，被服务商限流。 | 等几十秒到几分钟再试；批量补交时不要同时开多个程序窗口。 |
-| **请求超时** | 网络慢、代理不稳定，或 `ai.timeout` 设得太小。 | 先确认浏览器能打开 DeepSeek 网站；把 `xyb/config.json` 里的 `ai.timeout` 从 `90` 改成 `180` 或更大；使用代理时确认代理对程序生效。 |
+| **请求超时** | 网络慢、代理不稳定，或 `ai.timeout` 设得太小。 | 先确认浏览器能打开 DeepSeek 网站；把配置文件里的 `ai.timeout` 从 `90` 改成 `180` 或更大（EXE 版是 exe 同目录 `config.json`，源码版是 `xyb/config.json`）；使用代理时确认代理对程序生效。 |
 | **无法连接到 AI 接口 / 证书错误** | 断网、代理未开启、校园网或公司网络限制、系统时间不对。 | 浏览器访问 <https://platform.deepseek.com/> 验证网络；切换代理状态后重试；校准 Windows 系统时间；换一个网络环境试试。 |
 | **返回里没有 choices / 不是合法 JSON** | `base_url` 不是 OpenAI 兼容接口地址，或返回了网页错误页。 | 核对 `base_url` 是否是兼容接口地址（一般以 `/v1` 结尾），不要填成浏览器里打开的网页地址。 |
 | **AI 模型返回了空正文** | 偶发的模型输出问题，或 `model` 填成了非对话模型。 | 重新生成一次；持续为空就确认 `model` 是对话模型（DeepSeek 常用 `deepseek-chat`）。 |
@@ -142,7 +153,7 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
 ### 5.1 通用改法
 
 前提：该服务商提供 **OpenAI 兼容接口**（地址形如 `https://.../v1/chat/completions`）。
-满足这个前提时，只需要改 `xyb/config.json` 里 `ai` 段的 3 个值：
+满足这个前提时，只需要改配置文件（EXE 版：exe 同目录 `config.json`；源码版：`xyb/config.json`）里 `ai` 段的 3 个值：
 
 ```json
 "ai": {
@@ -157,7 +168,7 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
 其余配置（`internship`、`style` 等）都不用动。
 
 > 注意：菜单 6 的向导只问 Key、模型名、实习信息和字数，**不问 `base_url`**。
-> 换别家服务商时，请用「方式二：直接编辑 `xyb/config.json`」改 `base_url`。
+> 换别家服务商时，请用「方式二：直接编辑配置文件」改 `base_url`。
 
 ### 5.2 常见服务商参数表
 
@@ -174,7 +185,7 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
 
 ### 5.3 示例：换成通义千问
 
-把 `xyb/config.json` 的 `ai` 段改成：
+把配置文件（EXE 版：exe 同目录 `config.json`；源码版：`xyb/config.json`）的 `ai` 段改成：
 
 ```json
 "ai": {
@@ -186,7 +197,7 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
 }
 ```
 
-保存后重新打开 `start.bat`，选 2 生成一篇试试。
+保存后重新启动程序（EXE 版双击 exe；源码版双击 `start.bat`），选 2 生成一篇试试。
 
 ### 5.4 换模型的注意事项
 
@@ -201,14 +212,15 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
 
 ## 6. 安全提醒（务必看）
 
-- 你的 Key 只保存在**本机**的 `xyb/config.json` 里。
-- 仓库的 `.gitignore` 已把 `xyb/config.json`、`chrome-profile/`、`周志记录/`、
-  `xyb/qr.png`、`xyb/.pending*.json` 等本地文件排除，正常提交代码不会带上它们。
+- 你的 Key 只保存在**本机**的配置文件里：EXE 版是 exe 同目录的 `config.json`，源码版是 `xyb/config.json`。
+- 源码版仓库的 `.gitignore` 已把 `xyb/config.json`、`chrome-profile/`、`周志记录/`、
+  `xyb/qr.png`、`xyb/.pending*.json` 等本地文件排除，正常提交代码不会带上它们；
+  EXE 版的这些文件（`config.json`、`chrome-profile\`、`周志记录\` 等）都在 exe 同目录，本来就不在 git 仓库里。
 - **不要**做这些事：
   - 把 Key 发到班级群、QQ 群、微信群；
   - 把带 Key 的截图发到社交平台；
   - 把 Key 粘贴到 GitHub Issue、论坛或网盘；
-  - 在 `git add -f` 时强行把 `xyb/config.json` 加进去。
+  - 在 `git add -f` 时强行把源码版的 `xyb/config.json` 加进去。
 - **怀疑 Key 泄露了怎么办**：
   1. 登录 DeepSeek 后台，进入「API keys」；
   2. 删除旧的 Key（删除后立即失效）；
@@ -223,7 +235,7 @@ DeepSeek 提供「OpenAI 兼容接口」，所以只要服务商也兼容这种�
 1. 打开 <https://platform.deepseek.com/> 注册/登录。
 2. 左侧「API keys」→ 创建 → 复制 `sk-` 开头的 Key（只显示一次）。
 3. 在「充值」页充值；余额为 0 会报 402。
-4. 双击 `start.bat` → 菜单 `6` → 粘贴 Key → 保存，或直接改 `xyb/config.json`。
+4. 启动程序（EXE 版双击 exe；源码版双击 `start.bat`）→ 首次向导或菜单 `6` → 粘贴 Key → 保存；或直接改配置文件（EXE 版是 exe 同目录 `config.json`，源码版是 `xyb/config.json`）。
 5. 选菜单 `2` 生成一篇；能出正文就说明配好了。
 6. 换别家模型：只改 `ai.base_url`、`ai.model`、`ai.api_key`，详见第 5 节。
 7. Key 不外发；怀疑泄露就删掉重建。

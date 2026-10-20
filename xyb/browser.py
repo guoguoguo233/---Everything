@@ -17,9 +17,11 @@ from typing import Any
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-WORK = Path(__file__).resolve().parent.parent
-PROFILE_DIR = WORK / "chrome-profile"
-SESSION_FILE = WORK / "xyb" / ".session.json"
+import paths  # noqa: E402
+
+WORK = paths.app_dir()
+PROFILE_DIR = paths.profile_dir()
+SESSION_FILE = paths.session_path()
 
 PERSONAL = "https://www.xybsyw.com/personal/"
 
