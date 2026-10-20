@@ -447,6 +447,35 @@ HELP_TEXT = """\
 【出问题】  看同目录 _error.log；或用命令行运行 --check 做环境自检。"""
 
 
+def act_webui():
+    """启动本地网页控制台（只监听 127.0.0.1），并尝试打开浏览器。"""
+    import webbrowser
+
+    try:
+        import webui
+    except Exception as exc:
+        print("网页控制台组件加载失败：", exc)
+        pause()
+        return
+    try:
+        url = webui.start(open_browser=False)
+    except Exception as exc:
+        print("启动网页控制台失败：", exc)
+        pause()
+        return
+    print()
+    print("=" * 62)
+    print("  网页控制台已启动：" + url)
+    print("  已尝试在浏览器中打开；没弹出的话请手动复制上面的地址。")
+    print("  该服务只监听 127.0.0.1，外部无法访问；关闭本窗口即停止。")
+    print("=" * 62)
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+    pause()
+
+
 def act_help():
     print()
     print(LINE)
@@ -537,6 +566,17 @@ def main():
             return do_check()
         except KeyboardInterrupt:
             return 0
+    if "--webui" in argv:
+        # 直接以网页控制台模式启动（不开命令行菜单），方便双击/做快捷方式
+        import webui
+        url = webui.start(open_browser=("--no-browser" not in argv))
+        print("按 Ctrl+C 或关闭窗口停止服务：" + url)
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            webui.stop()
+        return 0
 
     config_existed = CONFIG.exists()
     cfg = load_cfg()
@@ -595,6 +635,7 @@ def main():
         print("  [5] 刷新本地归档（从校友邦回读）")
         print("  [6] 修改配置（AI Key / 实习信息 / 字数）")
         print("  [7] 查看使用说明")
+        print("  [8] 打开网页控制台（浏览器操作界面）")
         print("  [0] 退出")
         print("-" * 62)
         try:
@@ -621,11 +662,13 @@ def main():
             act_config(cfg)
         elif choice == "7":
             act_help()
+        elif choice == "8":
+            act_webui()
         elif choice == "0":
             print("\n再见。")
             return 0
         else:
-            print("没有这个选项，请输入 0-7。")
+            print("没有这个选项，请输入 0-8。")
             pause()
 
 
