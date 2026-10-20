@@ -16,7 +16,9 @@
 """
 import argparse
 import json
+import os
 import re
+import subprocess
 import sys
 import time
 from datetime import date, datetime
@@ -405,6 +407,55 @@ def qc_items(items: list[dict], min_words: int) -> list[str]:
     return problems
 
 
+def open_document(path: Path | str | None) -> bool:
+    """用系统默认程序打开文件；失败时退回记事本。"""
+    if not path or not Path(path).exists():
+        return False
+    p = str(path)
+    try:
+        os.startfile(p)  # type: ignore[attr-defined]
+        return True
+    except Exception:
+        pass
+    try:
+        subprocess.Popen(["notepad.exe", p], close_fds=True)
+        return True
+    except Exception:
+        return False
+
+
+def write_single_preview(cfg: dict, ctx: dict, week: dict, title: str, text: str) -> Path | None:
+    """为单篇周志写一份人类可读的预览文件（待提交预览_第N周.md）。"""
+    try:
+        rec = cfg.get("record") or {}
+        folder = ROOT / (rec.get("dir") or "周志记录")
+        folder.mkdir(parents=True, exist_ok=True)
+        idx = int(week.get("week") or 0)
+        path = folder / f"待提交预览_第{idx}周.md"
+        words = len([c for c in text if c.strip()])
+        content = "\n".join([
+            f"# 待提交预览：第{idx}周",
+            "",
+            f"- 标题：{title}",
+            f"- 周期：{to_dot(week.get('startDate'))} ~ {to_dot(week.get('endDate'))}",
+            f"- 字数：约 {words} 字",
+            f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            f"- 实习单位：{(ctx.get('unit') or {}).get('enterpriseName') or cfg.get('internship', {}).get('company') or '（自动读取）'}",
+            f"- 岗位：{(ctx.get('unit') or {}).get('postName') or cfg.get('internship', {}).get('position') or '（自动读取）'}",
+            "",
+            "> 这是**尚未提交**的内容。回到程序窗口后可以选择：直接提交 / 输入修改意见让 AI 重写 / 放弃。",
+            "",
+            "---",
+            "",
+            text.strip(),
+            "",
+        ])
+        path.write_text(content, encoding="utf-8")
+        return path
+    except Exception:
+        return None
+
+
 def run_batch(args, cfg: dict, ctx: dict, client) -> int:
     weeks = ctx["weeks"]
     all_idx = [int(w.get("week") or 0) for w in weeks]
@@ -552,6 +603,7 @@ def main():
     ap.add_argument("--regen-week", type=int, help="重新生成批次里的某一周（修正用）")
     ap.add_argument("--qc", action="store_true", help="质检待提交批次：字数/英文残留/重复度")
     ap.add_argument("--login-only", action="store_true", help="只检查/完成登录，然后退出")
+    ap.add_argument("--no-open", action="store_true", help="生成预览时不自动打开预览文件")
     args = ap.parse_args()
 
     cfg = ai_writer.load_config()
@@ -668,8 +720,17 @@ def main():
                     "content_text": text,
                     "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+                # 同时生成一份人类可读的预览文件，并（默认）自动打开，方便直接阅读/批注
+                preview_path = write_single_preview(cfg, ctx, week, title, text)
                 log(f"已保存待提交内容：{PENDING_PATH}")
-                log("确认无误后执行： python xyb\\run.py --submit-pending --yes")
+                log(f"预览文件：{preview_path}")
+                if not args.no_open and preview_path:
+                    if open_document(preview_path):
+                        log("已自动打开预览文件（可直接查看，看完回到本窗口操作）。")
+                    else:
+                        log("（自动打开失败，请手动打开上面的预览文件路径）")
+                log("本窗口稍后会询问：直接提交 / 给修改意见重新生成 / 放弃。")
                 continue
 
             if args.dry_run:

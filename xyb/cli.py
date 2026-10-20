@@ -251,11 +251,65 @@ def wizard(cfg: dict, first_run: bool = False) -> dict:
     return cfg
 
 
+# ---------------- 登录状态（主页展示） ----------------
+LOGIN_STATE = paths.app_dir() / "_login_state.json"
+LOGIN_TTL = 600  # 10 分钟内复用上次结果，避免每次进菜单都启动浏览器
+
+
+def probe_login(force: bool = False) -> dict:
+    """检测登录状态（带缓存）；返回 {logged_in, name, school, error}。"""
+    if not force:
+        try:
+            if LOGIN_STATE.exists():
+                data = json.loads(LOGIN_STATE.read_text(encoding="utf-8-sig"))
+                if time.time() - float(data.get("checked_at") or 0) < LOGIN_TTL:
+                    return data
+        except Exception:
+            pass
+
+    print("正在检查登录状态（约 5~8 秒，会启动一次浏览器）…")
+    data = {"logged_in": None, "checked_at": time.time()}
+    try:
+        from browser import XybClient
+        import auth
+        with XybClient(headless=True) as c:
+            c.goto("#/workbench")
+            c.page.wait_for_timeout(2500)
+            c.cache_secret_url()
+            if auth.is_logged_in(c):
+                info = auth.loginer_info(c) or {}
+                data.update(logged_in=True,
+                            name=info.get("loginer") or "",
+                            school=info.get("schoolName") or "")
+            else:
+                data.update(logged_in=False)
+    except Exception as exc:
+        data["error"] = str(exc)[:120]
+    try:
+        LOGIN_STATE.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+    return data
+
+
+def login_line(state: dict) -> str:
+    if state.get("logged_in") is True:
+        name = state.get("name") or "（未知用户）"
+        school = state.get("school") or "（未知学校）"
+        return f"已登录 — {name} / {school}"
+    if state.get("logged_in") is False:
+        return "未登录（请选 [1] 扫码登录）"
+    err = state.get("error") or "无法连接"
+    return f"未检测到（{err}）"
+
+
 # ---------------- 菜单动作 ----------------
 def act_login():
     print("\n正在启动浏览器检查登录状态…")
-    print("如果弹出提示要求登录：请用「校友邦学生版小程序」扫一扫（不是微信扫一扫）\n")
+    print("如果提示需要登录：请用「校友邦学生版小程序」扫一扫（不是微信扫一扫）\n")
     call(["--login-only"])
+    state = probe_login(force=True)
+    print(f"\n当前登录状态：{login_line(state)}")
     pause()
 
 
@@ -265,11 +319,38 @@ def act_write_current(cfg: dict):
         pause()
         return
     notes = ask("\n本周有什么真实素材？（例如：主要在做排序算法优化，可留空）", "")
-    args = []
-    if notes:
-        args += ["--notes", notes]
-    call(args)
-    pause()
+    feedback = ""
+    while True:
+        args = ["--gen-only"]
+        if not sys.stdin.isatty():
+            args.append("--no-open")  # 非交互环境（脚本/测试）不要弹编辑器
+        merged = notes
+        if feedback:
+            merged = (notes + "。" if notes else "") + "【用户修改意见】" + feedback
+        if merged:
+            args += ["--notes", merged]
+        code = call(args)
+        if code != 0:
+            print(f"\n生成失败（退出码 {code}），请把上面的报错发出来排查。")
+            pause()
+            return
+
+        ans = ask("预览文件已自动打开。下一步：y=提交 / m=输入修改意见重新生成 / n=放弃", "y")
+        choice = (ans or "").strip().lower()
+        if choice in ("y", "yes", "是", "提交", "ok"):
+            rc = call(["--submit-pending", "--yes"])
+            if rc == 0:
+                call_sync()
+            pause()
+            return
+        if choice in ("m", "modify", "改", "修改", "重写"):
+            feedback = ask("请输入修改意见（例如：多写具体工作细节 / 语气再朴素些 / 少写套话 / 多写遇到的困难）", "")
+            if not feedback:
+                print("没有输入修改意见，保持当前内容。")
+            continue
+        print("\n已放弃提交。内容已保存在本地，可稍后重新选 [2] 或 [3]。")
+        pause()
+        return
 
 
 def act_backfill(cfg: dict):
@@ -347,6 +428,49 @@ def call_sync():
 
 def act_config(cfg: dict):
     wizard(cfg)
+    pause()
+
+
+HELP_TEXT = """\
+【第 1 步】登录：选 [1]，用「校友邦学生版小程序」扫一扫（不是微信扫一扫）。
+           登录状态会显示在菜单顶部；失效时重新扫一次即可。
+【第 2 步】写周志：选 [2]，可先填本周真实素材 → 自动生成 →
+           自动打开预览文件给你看 → 回到窗口选择：
+             y = 提交到校友邦
+             m = 输入修改意见，让 AI 重新写一版（可反复改）
+             n = 放弃，内容仍保存在本地
+【批量补交】选 [3]：先生成所有未提交的周 → 打开预览文件审核 → 质检 → 确认后批量提交。
+【查看归档】选 [5]：从校友邦回读已提交内容，刷新「周志记录/周志记录.md」。
+【改配置】  选 [6]：修改 API Key、模型、实习信息、字数要求。
+【数据位置】config.json、chrome-profile、周志记录 都在本程序所在文件夹里，
+           整个文件夹拷走即可换电脑继续用。
+【出问题】  看同目录 _error.log；或用命令行运行 --check 做环境自检。"""
+
+
+def act_help():
+    print()
+    print(LINE)
+    print("  使用说明（要点）")
+    print(LINE)
+    print(HELP_TEXT)
+    print()
+
+    readme = paths.readme_path()
+    docs = paths.docs_dir()
+    print(f"完整文档：{readme}")
+    if docs.exists():
+        print(f"文档目录：{docs}")
+    print()
+    if ask("要现在打开 README 全文吗？(y/n)", "y").lower().startswith("y"):
+        try:
+            import run
+            opened = run.open_document(readme)
+        except Exception:
+            opened = False
+        if opened:
+            print("已打开（如果没弹出来，请按上面的路径手动打开）。")
+        else:
+            print("自动打开失败，请手动打开上面的路径。")
     pause()
 
 
@@ -450,6 +574,8 @@ def main():
         print("\n下一步：扫码登录。")
         act_login()
 
+    login_state = probe_login()
+
     while True:
         clear()
         cfg = load_cfg()
@@ -457,12 +583,13 @@ def main():
         print(f"  {TITLE}  v{VERSION}")
         print("  自动生成实习周志 → 预览确认 → 提交校友邦")
         print(LINE)
-        print(f"  AI Key：{key_status(cfg)}")
+        print(f"  登录状态：{login_line(login_state)}")
+        print(f"  AI Key ：{key_status(cfg)}")
         print(f"  配置文件：{CONFIG}")
         print(f"  运行方式：{'EXE 免安装版' if FROZEN else '源码版（Python）'}")
         print("-" * 62)
         print("  [1] 登录 / 检查登录状态")
-        print("  [2] 写本周周志（生成 → 预览 → 确认 → 提交）")
+        print("  [2] 写本周周志（生成 → 预览 → 修改或提交）")
         print("  [3] 批量补交历史周（先生成预览，确认后再提交）")
         print("  [4] 质检已生成的内容")
         print("  [5] 刷新本地归档（从校友邦回读）")
@@ -478,26 +605,22 @@ def main():
 
         if choice == "1":
             act_login()
+            login_state = probe_login()
         elif choice == "2":
             act_write_current(cfg)
+            login_state = probe_login(force=True)
         elif choice == "3":
             act_backfill(cfg)
+            login_state = probe_login(force=True)
         elif choice == "4":
             act_qc()
         elif choice == "5":
             act_sync()
+            login_state = probe_login(force=True)
         elif choice == "6":
             act_config(cfg)
         elif choice == "7":
-            readme = paths.readme_path()
-            if readme.exists():
-                try:
-                    os.startfile(str(readme))  # type: ignore[attr-defined]
-                except Exception:
-                    print("请手动打开：", readme)
-            else:
-                print("README.md 不存在。")
-            pause()
+            act_help()
         elif choice == "0":
             print("\n再见。")
             return 0

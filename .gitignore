@@ -1,4 +1,4 @@
-# ===== 本地私有数据（绝对不要提交，含你的 API Key 和学校信息）=====
+﻿# ===== 本地私有数据（绝对不要提交，含你的 API Key 和学校信息）=====
 xyb/config.json
 xyb/config*.json
 !xyb/config.example.json
@@ -43,3 +43,9 @@ research/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ===== 兼容启动器/EXE 运行时产生的文件 =====
+_login_state.json
+_cookies.json
+_error.log
+_tmp/
